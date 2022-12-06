@@ -1,6 +1,65 @@
 # Liquibase [![Build and Test](https://github.com/liquibase/liquibase/actions/workflows/build.yml/badge.svg)](https://github.com/liquibase/liquibase/actions/workflows/build.yml) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=liquibase&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=liquibase)
 <p align="center"><img src="https://github.com/liquibase/liquibase/blob/master/Liquibase.png" width="30%" height="30%"></p>
 
+# FORK CHANGES
+
+Simple POC to skip partitioned table listing through filtering metadata queries in this style:
+
+```
+WHERE NOT pgclass.relispartition
+```
+
+There's additional optimization room for optimizing heavy queries
+using the ANSI metadata views INFORMATION_SCHEMA as they are not partition
+aware and not only include partitions, but have no columns that can be used
+to identify and filter them out either so a rewrite is more time consuming.
+
+This Liquibase change alongside leveraging the forked JDBC driver
+is able to extract a change log from a db with >100,000 partitions
+in 2-4 minutes
+
+## Build
+
+1) Incremented version to 1-SNAPSHOT to distinguish from original
+
+2) Changed maven-install-plugin in liquibase-core pom.xml to install
+rather than skip locally as a simpler simple test than building whole liquibase-dist
+
+3) Added maven-assembly-plugin in liquibase-cli pom.xml to create a fat
+JAR including dependencies for easy usage of the cli.
+
+4) Build liquibase-core and liquibase-cli
+
+```
+cd liquibase-core
+mvn install -Dmaven.test.skip
+
+cd ..
+cd liquibase-cli
+mvn package -Dmaven.test.skip
+```
+
+## Configuration
+
+1) liquibase.properties added driver and reference to customized Postgres JDBC driver with similar fixes.
+
+```
+driver: org.postgresql.Driver
+classpath: postgresql-42.5.3-SNAPSHOT-all.jar
+```
+
+2) Custom compiled Postgres JDBC driver copied to working directory
+
+3) Environment variables set POSTGRES_URL, POSTGRES_USER, POSTGRES_PASS
+
+## Call
+
+```
+java -jar liquibase-cli/target/liquibase-cli-1-SNAPSHOT-jar-with-dependencies.jar --url=$POSTGRES_URL --defaultsFile=liquibase.properties --username=$POSTGRES_USER --password=$POSTGRES_PASS --schemas=$POSTGRES_SCHEMAS --changelogFile=dbchangelog.xml generateChangeLog
+```
+
+# Original README
+
 Liquibase helps millions of developers track, version, and deploy database schema changes. It will help you to:
 - Control database schema changes for specific versions
 - Eliminate errors and delays when releasing databases
